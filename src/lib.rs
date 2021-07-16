@@ -35,6 +35,21 @@ macro_rules! uart {
                 }
             }
 
+            impl embedded_hal::serial::Read<u8> for $UARTX {
+                type Error = core::convert::Infallible;
+
+                fn read(&mut self) -> nb::Result<u8, Self::Error> {
+                    // Wait until RXEMPTY is `0`
+                    if self.registers.rxempty.read().rxempty().bit() {
+                        Err(nb::Error::WouldBlock)
+                    } else {
+                        let data = self.registers.rxtx.read().rxtx().bits();
+                        self.registers.ev_pending.write(|w| w.rx().set_bit());
+                        Ok(data)
+                    }
+                }
+            }
+
             impl embedded_hal::blocking::serial::write::Default<u8> for $UARTX {}
         )+
     }
@@ -146,7 +161,6 @@ macro_rules! spi {
 }
 
 // Delay
-
 
 #[macro_export]
 macro_rules! timer {
