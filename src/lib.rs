@@ -17,17 +17,17 @@ macro_rules! uart {
 
                 fn write(&mut self, word: u8) -> nb::Result<(), Self::Error> {
                     // Wait until TXFULL is `0`
-                    if self.registers.txfull.read().bits() != 0 {
+                    if self.registers.txfull().read().bits() != 0 {
                         Err(nb::Error::WouldBlock)
                     } else {
                         unsafe {
-                            self.registers.rxtx.write(|w| w.rxtx().bits(word.into()));
+                            self.registers.rxtx().write(|w| w.rxtx().bits(word.into()));
                         }
                         Ok(())
                     }
                 }
                 fn flush(&mut self) -> nb::Result<(), Self::Error> {
-                    if self.registers.txempty.read().bits() != 0 {
+                    if self.registers.txempty().read().bits() != 0 {
                         Ok(())
                     } else {
                         Err(nb::Error::WouldBlock)
@@ -40,11 +40,11 @@ macro_rules! uart {
 
                 fn read(&mut self) -> nb::Result<u8, Self::Error> {
                     // Wait until RXEMPTY is `0`
-                    if self.registers.rxempty.read().rxempty().bit() {
+                    if self.registers.rxempty().read().rxempty().bit() {
                         Err(nb::Error::WouldBlock)
                     } else {
-                        let data = self.registers.rxtx.read().rxtx().bits();
-                        self.registers.ev_pending.write(|w| w.rx().set_bit());
+                        let data = self.registers.rxtx().read().rxtx().bits();
+                        self.registers.ev_pending().write(|w| w.rx().set_bit());
                         Ok(data)
                     }
                 }
@@ -82,9 +82,9 @@ macro_rules! gpio {
                     let reg = unsafe { &*<$PACGPIOX>::ptr() };
                     let mask: u32 = !(1 << self.index);
                     riscv::interrupt::free(|_cs| {
-                        let val: u32 = reg.out.read().bits() & mask;
+                        let val: u32 = reg.out().read().bits() & mask;
                         unsafe {
-                            reg.out.write(|w| w.bits(val));
+                            reg.out().write(|w| w.bits(val));
                         }
                     });
                     Ok(())
@@ -93,9 +93,9 @@ macro_rules! gpio {
                     let reg = unsafe { &*<$PACGPIOX>::ptr() };
                     let mask: u32 = 1 << self.index;
                     riscv::interrupt::free(|_cs| {
-                        let val: u32 = reg.out.read().bits() | mask;
+                        let val: u32 = reg.out().read().bits() | mask;
                         unsafe {
-                            reg.out.write(|w| w.bits(val));
+                            reg.out().write(|w| w.bits(val));
                         }
                     });
                     Ok(())
@@ -106,13 +106,13 @@ macro_rules! gpio {
                 fn is_set_low(&self) -> Result<bool, Self::Error> {
                     let reg = unsafe { &*<$PACGPIOX>::ptr() };
                     let mask: u32 = 1 << self.index;
-                    let val: u32 = reg.out.read().bits() & mask;
+                    let val: u32 = reg.out().read().bits() & mask;
                     Ok(val == 0)
                 }
                 fn is_set_high(&self) -> Result<bool, Self::Error> {
                     let reg = unsafe { &*<$PACGPIOX>::ptr() };
                     let mask: u32 = 1 << self.index;
-                    let val: u32 = reg.out.read().bits() & mask;
+                    let val: u32 = reg.out().read().bits() & mask;
                     Ok(val != 0)
                 }
             }
@@ -139,18 +139,18 @@ macro_rules! spi {
                 type Error = core::convert::Infallible;
 
                 fn read(&mut self) -> nb::Result<$WORD, Self::Error> {
-                    if self.registers.status.read().done().bit() {
-                        Ok(self.registers.miso.read().bits() as $WORD)
+                    if self.registers.status().read().done().bit() {
+                        Ok(self.registers.miso().read().bits() as $WORD)
                     } else {
                         Err(nb::Error::WouldBlock)
                     }
                 }
 
                 fn send(&mut self, word: u8) -> nb::Result<(), Self::Error> {
-                    if self.registers.status.read().done().bit() {
+                    if self.registers.status().read().done().bit() {
                         unsafe {
-                            self.registers.mosi.write(|w| w.bits(word.into()));
-                            self.registers.control.write(|w| {
+                            self.registers.mosi().write(|w| w.bits(word.into()));
+                            self.registers.control().write(|w| {
                                 w.length().bits(8).start().bit(true)
                             });
                         }
@@ -187,13 +187,13 @@ macro_rules! timer {
                 fn delay_ms(&mut self, ms: UXX) -> () {
                     let value: u32 = self.sys_clk / 1_000 * ms.into();
                     unsafe {
-                        self.registers.en.write(|w| w.bits(0));
-                        self.registers.reload.write(|w| w.bits(0));
-                        self.registers.load.write(|w| w.bits(value));
-                        self.registers.en.write(|w| w.bits(1));
-                        self.registers.update_value.write(|w| w.bits(1));
-                        while self.registers.value.read().bits() > 0 {
-                            self.registers.update_value.write(|w| w.bits(1));
+                        self.registers.en().write(|w| w.bits(0));
+                        self.registers.reload().write(|w| w.bits(0));
+                        self.registers.load().write(|w| w.bits(value));
+                        self.registers.en().write(|w| w.bits(1));
+                        self.registers.update_value().write(|w| w.bits(1));
+                        while self.registers.value().read().bits() > 0 {
+                            self.registers.update_value().write(|w| w.bits(1));
                         }
                     }
                 }
